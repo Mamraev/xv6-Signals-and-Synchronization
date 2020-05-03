@@ -360,7 +360,7 @@ scheduler(void)
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
+      if(p->state != RUNNABLE || p->frozen == 1)
         continue;
 
       // Switch to chosen process.  It is the process's job
@@ -591,6 +591,16 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact){
 
 /************************* SIGNAL HANDLERS *************************/
 void 
-sh_kill(){
+sh_sigkill(){
   myproc()->killed = 1;
+}
+
+void
+sh_sigstop(){
+  myproc()->frozen = 1;
+}
+
+void
+sh_cont(){
+  myproc()->frozen = 0;
 }
