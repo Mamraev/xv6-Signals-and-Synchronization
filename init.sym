@@ -15,7 +15,7 @@
 00000000 ulib.c
 00000000 printf.c
 00000400 printint
-00000850 digits.1046
+00000850 digits.1048
 00000000 umalloc.c
 00000b00 freep
 00000b04 base
@@ -51,6 +51,7 @@
 00000b0c _end
 000003a2 link
 00000342 exit
+000003f2 sigret
 000002d0 atoi
 00000170 strlen
 00000382 open

@@ -54,7 +54,8 @@ struct proc {
   // Task 2.1.1
   uint pendingSignals;
   uint signalMask;
-  struct sigaction* signalHandler[SIGNAL_HANDLERS_SIZE];
+  uint signalHandlerMasks[SIGNAL_HANDLERS_SIZE];
+  void* signalHandler[SIGNAL_HANDLERS_SIZE];
   struct trapframe *uTrapFrameBU;
 };
 

@@ -36,7 +36,7 @@ sys_kill(void)
     return -1;
   if(argint(1, &signum) < 0)
     return -1;
-  return kill(pid,SIGKILL);
+  return kill(pid,signum);
 }
 
 int
@@ -120,8 +120,11 @@ sys_sigaction(void){
     return -1;
   }
 
-  if(oldact!=NULL){
-    oldact = myproc()->signalHandler[signum];
-  }
   return sigaction(signum, act, oldact);
+}
+
+int 
+sys_sigret(void){
+  sigret();
+  return 0;
 }

@@ -6084,10 +6084,12 @@ SYSCALL(sigaction)
     395a:	b8 17 00 00 00       	mov    $0x17,%eax
     395f:	cd 40                	int    $0x40
     3961:	c3                   	ret    
-    3962:	66 90                	xchg   %ax,%ax
-    3964:	66 90                	xchg   %ax,%ax
-    3966:	66 90                	xchg   %ax,%ax
-    3968:	66 90                	xchg   %ax,%ax
+
+00003962 <sigret>:
+SYSCALL(sigret)
+    3962:	b8 18 00 00 00       	mov    $0x18,%eax
+    3967:	cd 40                	int    $0x40
+    3969:	c3                   	ret    
     396a:	66 90                	xchg   %ax,%ax
     396c:	66 90                	xchg   %ax,%ax
     396e:	66 90                	xchg   %ax,%ax

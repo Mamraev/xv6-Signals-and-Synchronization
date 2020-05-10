@@ -3,7 +3,7 @@ typedef unsigned short ushort;
 typedef unsigned char  uchar;
 typedef uint pde_t;
 
-#define NULL (void*)0
+#define null (void*)0
 
 #define SIGNAL_HANDLERS_SIZE 32
 

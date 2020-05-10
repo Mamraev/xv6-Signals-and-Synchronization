@@ -123,6 +123,14 @@ void            wakeup(void*);
 void            yield(void);
 uint            sigprocmask(uint);
 int             sigaction(int, const struct sigaction*, struct sigaction*);
+void            sh_sigkill();
+void            sh_sigstop();
+void            sh_sigcont();
+void            sigret();
+
+// sigretasm.S
+void sigret_start(void);
+void sigret_end(void);
 
 // swtch.S
 void            swtch(struct context**, struct context*);

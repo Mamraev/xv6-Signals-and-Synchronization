@@ -6,6 +6,7 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "sigaction.h"
 
 struct {
   struct spinlock lock;
@@ -111,6 +112,10 @@ found:
   }
   sp = p->kstack + KSTACKSIZE;
 
+  // Task 2.4 :     Leave room for the user trap frame backup
+  sp -= sizeof *p->uTrapFrameBU;
+  p->uTrapFrameBU = (struct trapframe*)sp;
+
   // Leave room for trap frame.
   sp -= sizeof *p->tf;
   p->tf = (struct trapframe*)sp;
@@ -127,7 +132,8 @@ found:
 
   // Task 2.1.2 :     init signal handlers to SIG_DGL
   for(int i = 0 ; i < SIGNAL_HANDLERS_SIZE ; i++){
-    p->signalHandler[i] = SIG_DFL;
+    p->signalHandler[i] =(void*)SIG_DFL;
+    p->signalHandlerMasks[i] = 0;
   }
   return p;
 }
@@ -223,8 +229,9 @@ fork(void)
   // Task 2.1.2 :     Copy signal mask and signal handlers to the child
   np->signalMask = curproc->signalMask;
 
-  for(int i = 0 ; i < sizeof(curproc->signalMask)/sizeof(uint) ; i++){
+  for(int i = 0 ; i < 32 ; i++){
     np->signalHandler[i] = curproc->signalHandler[i];
+    np->signalHandlerMasks[i] = curproc->signalHandlerMasks[i];
   }
 
   // Clear %eax so that fork returns 0 in the child.
@@ -521,7 +528,7 @@ kill(int pid, int signum)
     if(p->pid == pid){
       //p->killed = 1; TODO : add this to SIGKILL
       // Wake process from sleep if necessary.
-      p->pendingSignals |= 1 << signum;
+      p->pendingSignals |= (1 << signum);
       //check for unblockable sigs
       if((signum==SIGKILL||signum==SIGSTOP)&&(p->state == SLEEPING))
         p->state = RUNNABLE;
@@ -581,11 +588,14 @@ int
 sigaction(int signum, const struct sigaction *act, struct sigaction *oldact){
   struct proc *p;
   p=myproc();
-  if(oldact!=NULL){
-    oldact = p->signalHandler[signum];
-  }
-  p->signalHandler[signum] = (void*)act;
-  
+  if(oldact!=null){ // TODO change to NULL
+    oldact->sa_handler = p->signalHandler[signum];
+    oldact->sigmask = p->signalHandlerMasks[signum];
+  } 
+
+  p->signalHandler[signum] = act->sa_handler;
+  p->signalHandlerMasks[signum] = act->sigmask;
+
   return 0;
 }
 
@@ -597,10 +607,83 @@ sh_sigkill(){
 
 void
 sh_sigstop(){
-  myproc()->frozen = 1;
+  //myproc()->frozen = 1;
 }
 
 void
-sh_cont(){
+sh_sigcont(){
   myproc()->frozen = 0;
+}
+
+void 
+sigret(){
+  //*(myproc()->tf)=*(myproc()->uTrapFrameBU);
+  cprintf("%s\n","sigret!");
+
+  memmove(myproc()->tf, myproc()->uTrapFrameBU, sizeof(struct trapframe));
+}
+
+void
+handle_signals(struct trapframe *tf){
+    if((tf->cs &3) != DPL_USER)
+      return;
+
+    if(myproc()->killed){
+      return;
+    }
+    
+
+    for(int i = 0 ; i < 32 ; i++){   
+      if((myproc()->pendingSignals & (1 << i))!=0){
+        memmove(myproc()->uTrapFrameBU, myproc()->tf, sizeof(struct trapframe));
+
+        if(((myproc()->signalMask & (1 << i)) != 0) && i != SIGKILL && i != SIGSTOP){
+          continue; // signal is blocked and blockable
+        }
+        if(myproc()->signalHandler[i]==(void*)SIG_IGN){
+          continue; // signal ignored
+        }
+
+        myproc()->pendingSignals &= ~(0 << i);
+        
+        if(i == SIGKILL||i == SIGSTOP||myproc()->signalHandler[i]==(void*)SIG_DFL){    
+          // kernel signal
+          switch (i)
+          {
+          case SIGSTOP:
+            sh_sigstop();
+            break;
+          case SIGCONT:
+            sh_sigcont();
+            break;
+          default:
+            //cprintf("%s %d\n","killed !    ",i);
+
+            sh_sigkill();
+            break;
+          }
+        }
+        else { 
+          // user signal
+          cprintf("%s %d\n","USER SIGNAL!", i);
+          myproc()->signalMask = myproc()->signalHandlerMasks[i];
+
+          // inject sigret
+          memmove(myproc()->uTrapFrameBU, tf, sizeof(struct trapframe));
+          myproc()->tf->esp -= (uint)&sigret_end - (uint)&sigret_start;
+          memmove((void*)myproc()->tf->esp,sigret_start, (uint)&sigret_end - (uint)&sigret_start);
+
+          //modify stack
+          *((int*)(myproc()->tf->esp-4)) = i;
+          *((int*)(myproc()->tf->esp-8)) = myproc()->tf->esp;
+          myproc()->tf->esp -= 8;
+
+          //cprintf("%s %d %d\n","one",myproc()->signalHandler[i]->sa_handler,myproc()->signalHandler[1]->sa_handler);
+
+          myproc()->tf->eip = (uint)myproc()->signalHandler[i];
+          return;
+
+        }
+      }
+    }
 }
