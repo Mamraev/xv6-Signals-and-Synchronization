@@ -10,7 +10,8 @@
 
 /*TODOS :
   check about backuping mask, what happend if we change it during user signal handler
-  
+  check when killing frozen & runnable proc
+
 */
 struct {
   struct spinlock lock;
@@ -616,7 +617,6 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact){
 void 
 sh_sigkill(){
   myproc()->killed = 1;
-  exit();
 }
 
 void
@@ -633,8 +633,8 @@ sh_sigcont(){
 void 
 sigret(){
   //*(myproc()->tf)=*(myproc()->uTrapFrameBU);
-  cprintf("%s\n","sigret!");
-  cprintf("%d %d\n","sigret!",myproc()->tf,myproc()->uTrapFrameBU);
+  //cprintf("%s\n","sigret!");
+  //cprintf("%d %d\n","sigret!",myproc()->tf,myproc()->uTrapFrameBU);
 
   memmove(&myproc()->signalMask, &myproc()->signalMaskBU, 4);
 
@@ -645,9 +645,12 @@ void
 handle_signals(struct trapframe *tf){
     if((tf->cs &3) != DPL_USER)
       return;
+
+    if(myproc()->killed == 1){
+      return;
+    }
     
-    memmove(myproc()->uTrapFrameBU, myproc()->tf, sizeof(struct trapframe));
-    myproc()->signalMaskBU = myproc()->signalMask;
+    //myproc()->signalMaskBU = myproc()->signalMask;
 
 
     for(int i = 0 ; (myproc()->pendingSignals != 0) && i < 32 ; i++){   
@@ -683,9 +686,12 @@ handle_signals(struct trapframe *tf){
         }
         else { 
           // user signal
-          cprintf("%s %d\n","USER SIGNAL!", i);
+          //cprintf("%s %d\n","USER SIGNAL!", i);
 
-          myproc()->signalMaskBU = sigprocmask(myproc()->signalHandlerMasks[i]);
+          memmove(&myproc()->signalMaskBU,&myproc()->signalMask,4);
+          myproc()->signalMask = myproc()->signalHandlerMasks[i];
+
+          memmove(myproc()->uTrapFrameBU, myproc()->tf, sizeof(struct trapframe));
 
           // inject sigret
           myproc()->tf->esp -= (uint)&sigret_end - (uint)&sigret_start;
@@ -699,7 +705,7 @@ handle_signals(struct trapframe *tf){
           //cprintf("%s %d %d\n","one",myproc()->signalHandler[i]->sa_handler,myproc()->signalHandler[1]->sa_handler);
 
           myproc()->tf->eip = (uint)myproc()->signalHandler[i];
-          cprintf("%s %d\n","end!", i);
+          //cprintf("%s %d\n","end!", i);
 
           return;
 
