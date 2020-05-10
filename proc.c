@@ -115,6 +115,7 @@ found:
   // Task 2.4 :     Leave room for the user trap frame backup
   sp -= sizeof *p->uTrapFrameBU;
   p->uTrapFrameBU = (struct trapframe*)sp;
+  
 
   // Leave room for trap frame.
   sp -= sizeof *p->tf;
@@ -367,7 +368,18 @@ scheduler(void)
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE || p->frozen == 1)
+
+      // Handles frozen proc
+      if(p->frozen == 1){
+        if((p->pendingSignals & (1 << SIGCONT))!=0){
+          sh_sigcont();
+          p->pendingSignals &= ~(0 << SIGCONT);
+        }else{
+          continue;
+        }
+      }
+
+      if(p->state != RUNNABLE)
         continue;
 
       // Switch to chosen process.  It is the process's job
@@ -514,10 +526,7 @@ int
 kill(int pid, int signum)
 {
   struct proc *p;
-  // signum checks:
-  if(signum == 0){
-    return 0;
-  }
+
   if(signum<0||signum>=32){
     return -1;
   }
@@ -530,7 +539,7 @@ kill(int pid, int signum)
       // Wake process from sleep if necessary.
       p->pendingSignals |= (1 << signum);
       //check for unblockable sigs
-      if((signum==SIGKILL||signum==SIGSTOP)&&(p->state == SLEEPING))
+      if((signum==SIGKILL)&&(p->state == SLEEPING))
         p->state = RUNNABLE;
       release(&ptable.lock);
       return 0;
@@ -603,11 +612,13 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact){
 void 
 sh_sigkill(){
   myproc()->killed = 1;
+  exit();
 }
 
 void
 sh_sigstop(){
-  //myproc()->frozen = 1;
+  myproc()->frozen = 1;
+  yield();
 }
 
 void
@@ -619,6 +630,7 @@ void
 sigret(){
   //*(myproc()->tf)=*(myproc()->uTrapFrameBU);
   cprintf("%s\n","sigret!");
+  cprintf("%d %d\n","sigret!",myproc()->tf,myproc()->uTrapFrameBU);
 
   memmove(myproc()->tf, myproc()->uTrapFrameBU, sizeof(struct trapframe));
 }
@@ -627,24 +639,22 @@ void
 handle_signals(struct trapframe *tf){
     if((tf->cs &3) != DPL_USER)
       return;
-
-    if(myproc()->killed){
-      return;
-    }
     
+    memmove(myproc()->uTrapFrameBU, myproc()->tf, sizeof(struct trapframe));
 
-    for(int i = 0 ; i < 32 ; i++){   
+    for(int i = 0 ; (myproc()->pendingSignals != 0) && i < 32 ; i++){   
+
       if((myproc()->pendingSignals & (1 << i))!=0){
-        memmove(myproc()->uTrapFrameBU, myproc()->tf, sizeof(struct trapframe));
 
         if(((myproc()->signalMask & (1 << i)) != 0) && i != SIGKILL && i != SIGSTOP){
           continue; // signal is blocked and blockable
         }
-        if(myproc()->signalHandler[i]==(void*)SIG_IGN){
+        if(myproc()->signalHandler[i]==(void*)SIG_IGN && i != SIGKILL && i != SIGSTOP){
           continue; // signal ignored
         }
 
-        myproc()->pendingSignals &= ~(0 << i);
+        myproc()->pendingSignals &= ~(1 << i);
+
         
         if(i == SIGKILL||i == SIGSTOP||myproc()->signalHandler[i]==(void*)SIG_DFL){    
           // kernel signal
@@ -669,7 +679,6 @@ handle_signals(struct trapframe *tf){
           myproc()->signalMask = myproc()->signalHandlerMasks[i];
 
           // inject sigret
-          memmove(myproc()->uTrapFrameBU, tf, sizeof(struct trapframe));
           myproc()->tf->esp -= (uint)&sigret_end - (uint)&sigret_start;
           memmove((void*)myproc()->tf->esp,sigret_start, (uint)&sigret_end - (uint)&sigret_start);
 
@@ -681,6 +690,8 @@ handle_signals(struct trapframe *tf){
           //cprintf("%s %d %d\n","one",myproc()->signalHandler[i]->sa_handler,myproc()->signalHandler[1]->sa_handler);
 
           myproc()->tf->eip = (uint)myproc()->signalHandler[i];
+          cprintf("%s %d\n","end!", i);
+
           return;
 
         }

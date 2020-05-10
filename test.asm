@@ -6,7 +6,7 @@ Disassembly of section .text:
 
 00000000 <main>:
   printf(1, "signal called!!!\n");
-  printf(1, "signal called!!!\n");
+  exit();
 }
 
 int
@@ -115,10 +115,8 @@ signalHandler(int signum){ //added
   d2:	68 f8 07 00 00       	push   $0x7f8
   d7:	6a 01                	push   $0x1
   d9:	e8 c2 03 00 00       	call   4a0 <printf>
-}
-  de:	83 c4 10             	add    $0x10,%esp
-  e1:	c9                   	leave  
-  e2:	c3                   	ret    
+  exit();
+  de:	e8 5f 02 00 00       	call   342 <exit>
   e3:	66 90                	xchg   %ax,%ax
   e5:	66 90                	xchg   %ax,%ax
   e7:	66 90                	xchg   %ax,%ax
@@ -1027,7 +1025,7 @@ free(void *ap)
 
   bp = (Header*)ap - 1;
   for(p = freep; !(bp > p && bp < p->s.ptr); p = p->s.ptr)
- 671:	a1 fc 0a 00 00       	mov    0xafc,%eax
+ 671:	a1 f8 0a 00 00       	mov    0xaf8,%eax
 {
  676:	89 e5                	mov    %esp,%ebp
  678:	57                   	push   %edi
@@ -1068,7 +1066,7 @@ free(void *ap)
     p->s.ptr = bp;
  6ad:	89 08                	mov    %ecx,(%eax)
   freep = p;
- 6af:	a3 fc 0a 00 00       	mov    %eax,0xafc
+ 6af:	a3 f8 0a 00 00       	mov    %eax,0xaf8
 }
  6b4:	5b                   	pop    %ebx
  6b5:	5e                   	pop    %esi
@@ -1100,7 +1098,7 @@ free(void *ap)
     p->s.size += bp->s.size;
  6e7:	03 53 fc             	add    -0x4(%ebx),%edx
   freep = p;
- 6ea:	a3 fc 0a 00 00       	mov    %eax,0xafc
+ 6ea:	a3 f8 0a 00 00       	mov    %eax,0xaf8
     p->s.size += bp->s.size;
  6ef:	89 50 04             	mov    %edx,0x4(%eax)
     p->s.ptr = bp->s.ptr;
@@ -1133,7 +1131,7 @@ malloc(uint nbytes)
   nunits = (nbytes + sizeof(Header) - 1)/sizeof(Header) + 1;
  709:	8b 45 08             	mov    0x8(%ebp),%eax
   if((prevp = freep) == 0){
- 70c:	8b 15 fc 0a 00 00    	mov    0xafc,%edx
+ 70c:	8b 15 f8 0a 00 00    	mov    0xaf8,%edx
   nunits = (nbytes + sizeof(Header) - 1)/sizeof(Header) + 1;
  712:	8d 78 07             	lea    0x7(%eax),%edi
  715:	c1 ef 03             	shr    $0x3,%edi
@@ -1170,7 +1168,7 @@ malloc(uint nbytes)
       return (void*)(p + 1);
     }
     if(p == freep)
- 751:	39 05 fc 0a 00 00    	cmp    %eax,0xafc
+ 751:	39 05 f8 0a 00 00    	cmp    %eax,0xaf8
  757:	89 c2                	mov    %eax,%edx
  759:	75 ed                	jne    748 <malloc+0x48>
   p = sbrk(nu * sizeof(Header));
@@ -1189,7 +1187,7 @@ malloc(uint nbytes)
  775:	50                   	push   %eax
  776:	e8 f5 fe ff ff       	call   670 <free>
   return freep;
- 77b:	8b 15 fc 0a 00 00    	mov    0xafc,%edx
+ 77b:	8b 15 f8 0a 00 00    	mov    0xaf8,%edx
       if((p = morecore(nunits)) == 0)
  781:	83 c4 10             	add    $0x10,%esp
  784:	85 d2                	test   %edx,%edx
@@ -1218,7 +1216,7 @@ malloc(uint nbytes)
         p->s.size = nunits;
  7a4:	89 78 04             	mov    %edi,0x4(%eax)
       freep = prevp;
- 7a7:	89 15 fc 0a 00 00    	mov    %edx,0xafc
+ 7a7:	89 15 f8 0a 00 00    	mov    %edx,0xaf8
 }
  7ad:	8d 65 f4             	lea    -0xc(%ebp),%esp
       return (void*)(p + 1);
@@ -1232,13 +1230,13 @@ malloc(uint nbytes)
  7b8:	90                   	nop
  7b9:	8d b4 26 00 00 00 00 	lea    0x0(%esi,%eiz,1),%esi
     base.s.ptr = freep = prevp = &base;
- 7c0:	c7 05 fc 0a 00 00 00 	movl   $0xb00,0xafc
- 7c7:	0b 00 00 
- 7ca:	c7 05 00 0b 00 00 00 	movl   $0xb00,0xb00
- 7d1:	0b 00 00 
+ 7c0:	c7 05 f8 0a 00 00 fc 	movl   $0xafc,0xaf8
+ 7c7:	0a 00 00 
+ 7ca:	c7 05 fc 0a 00 00 fc 	movl   $0xafc,0xafc
+ 7d1:	0a 00 00 
     base.s.size = 0;
- 7d4:	b8 00 0b 00 00       	mov    $0xb00,%eax
- 7d9:	c7 05 04 0b 00 00 00 	movl   $0x0,0xb04
+ 7d4:	b8 fc 0a 00 00       	mov    $0xafc,%eax
+ 7d9:	c7 05 00 0b 00 00 00 	movl   $0x0,0xb00
  7e0:	00 00 00 
  7e3:	e9 44 ff ff ff       	jmp    72c <malloc+0x2c>
  7e8:	90                   	nop

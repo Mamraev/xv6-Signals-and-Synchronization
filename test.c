@@ -14,6 +14,7 @@ signalHandler(int signum){ //added
   printf(1, "signal called!!!\n");
   printf(1, "signal called!!!\n");
   printf(1, "signal called!!!\n");
+  exit();
 }
 
 int
