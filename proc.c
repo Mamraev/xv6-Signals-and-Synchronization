@@ -8,6 +8,10 @@
 #include "spinlock.h"
 #include "sigaction.h"
 
+/*TODOS :
+  check about backuping mask, what happend if we change it during user signal handler
+  
+*/
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
@@ -632,6 +636,8 @@ sigret(){
   cprintf("%s\n","sigret!");
   cprintf("%d %d\n","sigret!",myproc()->tf,myproc()->uTrapFrameBU);
 
+  memmove(&myproc()->signalMask, &myproc()->signalMaskBU, 4);
+
   memmove(myproc()->tf, myproc()->uTrapFrameBU, sizeof(struct trapframe));
 }
 
@@ -641,6 +647,8 @@ handle_signals(struct trapframe *tf){
       return;
     
     memmove(myproc()->uTrapFrameBU, myproc()->tf, sizeof(struct trapframe));
+    myproc()->signalMaskBU = myproc()->signalMask;
+
 
     for(int i = 0 ; (myproc()->pendingSignals != 0) && i < 32 ; i++){   
 
@@ -676,7 +684,8 @@ handle_signals(struct trapframe *tf){
         else { 
           // user signal
           cprintf("%s %d\n","USER SIGNAL!", i);
-          myproc()->signalMask = myproc()->signalHandlerMasks[i];
+
+          myproc()->signalMaskBU = sigprocmask(myproc()->signalHandlerMasks[i]);
 
           // inject sigret
           myproc()->tf->esp -= (uint)&sigret_end - (uint)&sigret_start;
