@@ -632,81 +632,73 @@ sh_sigcont(){
 
 void 
 sigret(){
-  //*(myproc()->tf)=*(myproc()->uTrapFrameBU);
-  //cprintf("%s\n","sigret!");
-  //cprintf("%d %d\n","sigret!",myproc()->tf,myproc()->uTrapFrameBU);
-
   memmove(&myproc()->signalMask, &myproc()->signalMaskBU, 4);
-
   memmove(myproc()->tf, myproc()->uTrapFrameBU, sizeof(struct trapframe));
+  cprintf("%s\n","sigret");
+
 }
 
 void
 handle_signals(struct trapframe *tf){
+    struct proc* p = myproc();
+
     if((tf->cs &3) != DPL_USER)
       return;
 
-    if(myproc()->killed == 1){
+    if(p->killed == 1){
       return;
     }
-    
-    //myproc()->signalMaskBU = myproc()->signalMask;
 
+    for(int i = 0 ; (p->pendingSignals != 0) && i < 32 ; i++){   
 
-    for(int i = 0 ; (myproc()->pendingSignals != 0) && i < 32 ; i++){   
+      uint espbu = p->tf->esp;
 
-      if((myproc()->pendingSignals & (1 << i))!=0){
+      int unblockable = (i == SIGKILL) || (i == SIGSTOP);
 
-        if(((myproc()->signalMask & (1 << i)) != 0) && i != SIGKILL && i != SIGSTOP){
+      if((p->pendingSignals & (1 << i)) != 0){
+
+        if(((p->signalMask & (1 << i)) != 0) && unblockable){
           continue; // signal is blocked and blockable
         }
-        if(myproc()->signalHandler[i]==(void*)SIG_IGN && i != SIGKILL && i != SIGSTOP){
-          continue; // signal ignored
+        if(p->signalHandler[i]==(void*)SIG_IGN && unblockable){
+          continue; // signal ignored and blockable
         }
 
-        myproc()->pendingSignals &= ~(1 << i);
+        p->pendingSignals &= ~(1 << i);
 
-        
-        if(i == SIGKILL||i == SIGSTOP||myproc()->signalHandler[i]==(void*)SIG_DFL){    
-          // kernel signal
-          switch (i)
-          {
-          case SIGSTOP:
-            sh_sigstop();
-            break;
-          case SIGCONT:
-            sh_sigcont();
-            break;
-          default:
-            //cprintf("%s %d\n","killed !    ",i);
+        if(p->signalHandler[i] == (void*)SIGKILL || p->signalHandler[i] == (void*)SIG_DFL){
+          sh_sigkill();
 
-            sh_sigkill();
-            break;
-          }
-        }
-        else { 
+        }else if(p->signalHandler[i] == (void*)SIGSTOP){
+          sh_sigstop();
+
+        }else if(p->signalHandler[i] == (void*)SIGCONT){
+          sh_sigcont();
+
+        }else { 
           // user signal
-          //cprintf("%s %d\n","USER SIGNAL!", i);
+          memmove(&p->signalMaskBU,&p->signalMask,4);
+          p->signalMask = p->signalHandlerMasks[i];
 
-          memmove(&myproc()->signalMaskBU,&myproc()->signalMask,4);
-          myproc()->signalMask = myproc()->signalHandlerMasks[i];
 
-          memmove(myproc()->uTrapFrameBU, myproc()->tf, sizeof(struct trapframe));
+
+          p->tf->esp -= sizeof (struct trapframe);
+          p->uTrapFrameBU = (void*) (p->tf->esp);
+          memmove(p->uTrapFrameBU, p->tf, sizeof(struct trapframe));
+          p->uTrapFrameBU->esp=espbu;
+
 
           // inject sigret
-          myproc()->tf->esp -= (uint)&sigret_end - (uint)&sigret_start;
-          memmove((void*)myproc()->tf->esp,sigret_start, (uint)&sigret_end - (uint)&sigret_start);
-
+          p->tf->esp -= (uint)&sigret_end - (uint)&sigret_start;
+          memmove((void*)p->tf->esp,sigret_start, (uint)&sigret_end - (uint)&sigret_start);
+          
           //modify stack
-          *((int*)(myproc()->tf->esp-4)) = i;
-          *((int*)(myproc()->tf->esp-8)) = myproc()->tf->esp;
-          myproc()->tf->esp -= 8;
+          
+          *((int*)(p->tf->esp-4)) = i;
+          *((int*)(p->tf->esp-8)) = p->tf->esp;
+          p->tf->esp -= 8;
 
-          //cprintf("%s %d %d\n","one",myproc()->signalHandler[i]->sa_handler,myproc()->signalHandler[1]->sa_handler);
-
-          myproc()->tf->eip = (uint)myproc()->signalHandler[i];
-          //cprintf("%s %d\n","end!", i);
-
+          p->tf->eip = (uint)p->signalHandler[i];
           return;
 
         }
