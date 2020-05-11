@@ -9,27 +9,28 @@
 #include "memlayout.h"
 #include "sigaction.h" // added
 
+
 void 
 signalHandler(int signum){ //added
-  printf(1, "\n---- user signal works");
-
+  printf(1, " A");
   exit();
 }
 
 void 
 signalHandler2(int signum){ //added
-  printf(1, "\n---- block mask works");
-
+  printf(1, " B");
   exit();
 }
 
 void 
 signalHandlerNoExit(int signum){ //added
-  printf(1, "\n---- user signal works NO EXIT");
+  printf(1, " C");
   return;
 }
 void
 send_signal_test(){
+    printf(1, "\n\n[start] send signal test | should print : A B\n\n[");
+
     struct sigaction *act= malloc(sizeof(struct sigaction*));
     act->sa_handler=signalHandler;
 
@@ -51,21 +52,19 @@ send_signal_test(){
         kill(pid2,2);
 
     }else{
-        while (1)
-        {
-        printf(1, " ");
+        sleep(4);
 
-        }
         
     }
     wait();
     wait();
-    printf(1, "\n[finished] send signal test\n");
-    exit();
+    printf(1, " ] [finished] \n\n");
 }
 
 void
 sigret_test(){    
+  printf(1, "\n[start] sigret test test | should print :  C  \n\n[");
+
   struct sigaction *act= malloc(sizeof(struct sigaction*));
   act->sa_handler=signalHandlerNoExit;
 
@@ -77,18 +76,17 @@ sigret_test(){
     kill(pid,1);
   }else{
       sleep(4);
-      printf(1, "\n[finished] sigret_test test (should see this after user signal)\n");
+      printf(1, " ] [finished]\n");
       exit();
 
   }
   wait();
-  exit();
 
 }
 
 int
 main(int argc, char *argv[]){
-  //send_signal_test();
+  send_signal_test();
   sigret_test();
   exit();
 }

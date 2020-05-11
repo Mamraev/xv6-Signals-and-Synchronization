@@ -376,12 +376,15 @@ scheduler(void)
 
       // Handles frozen proc
       if(p->frozen == 1){
-        if((p->pendingSignals & (1 << SIGCONT))!=0){
-          sh_sigcont();
-          p->pendingSignals &= ~(0 << SIGCONT);
-        }else{
-          continue;
+        for(int i = 0 ; (p->pendingSignals!=0) && i < 32; i++){
+          if(((p->pendingSignals & (1 << i))!=0) && (p->signalHandler[i] == (void*) SIGCONT)){
+            p->pendingSignals &= ~(0 << i);
+            sh_sigcont();
+          }else{
+            continue;
+          }
         }
+
       }
 
       if(p->state != RUNNABLE)
@@ -634,8 +637,6 @@ void
 sigret(){
   memmove(&myproc()->signalMask, &myproc()->signalMaskBU, 4);
   memmove(myproc()->tf, myproc()->uTrapFrameBU, sizeof(struct trapframe));
-  cprintf("%s\n","sigret");
-
 }
 
 void
