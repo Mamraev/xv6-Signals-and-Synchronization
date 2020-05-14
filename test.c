@@ -9,7 +9,6 @@
 #include "memlayout.h"
 #include "sigaction.h" // added
 
-
 void 
 signalHandler(int signum){ //added
   printf(1, " A");
@@ -18,7 +17,7 @@ signalHandler(int signum){ //added
 
 void 
 signalHandler2(int signum){ //added
-  printf(1, " B");
+  printf(1, "B");
   exit();
 }
 
@@ -29,7 +28,7 @@ signalHandlerNoExit(int signum){ //added
 }
 void
 send_signal_test(){
-    printf(1, "\n\n[start] send signal test | should print : A B\n\n[");
+    printf(1, "\n\n[start] send signal & mask test | should print : A B\n\n[");
 
     struct sigaction *act= malloc(sizeof(struct sigaction*));
     act->sa_handler=signalHandler;
@@ -48,22 +47,21 @@ send_signal_test(){
 
     if(pid != 0 && pid2 != 0){
         kill(pid,1);
+        sleep(10);
         kill(pid2,1);
         kill(pid2,2);
 
     }else{
-        sleep(4);
-
-        
+        sleep(20);
     }
     wait();
     wait();
-    printf(1, " ] [finished] \n\n");
+    printf(1, " ] [finished]\n\n");
 }
 
 void
 sigret_test(){    
-  printf(1, "\n[start] sigret test test | should print :  C  \n\n[");
+  printf(1, "\n[start] sigret test | should print :  C  \n\n[");
 
   struct sigaction *act= malloc(sizeof(struct sigaction*));
   act->sa_handler=signalHandlerNoExit;
@@ -84,9 +82,32 @@ sigret_test(){
 
 }
 
+void
+stop_cont_test(){
+    printf(1, "\n[start] stop cont test | should print :  A B C D \n\n[");
+
+    int fork_id = fork();
+    if (fork_id == 0){
+        sleep(20); //get stop signal
+        printf(1, " D");
+        exit();
+    }
+    else{
+        printf(1, " A");
+        kill(fork_id, SIGSTOP); 
+        printf(1, " B");
+        sleep(70);
+        printf(1, " C");
+        kill(fork_id, SIGCONT); 
+        wait();
+        printf(1, " ] [finished]\n");
+    }
+}
+
 int
 main(int argc, char *argv[]){
   send_signal_test();
   sigret_test();
+  stop_cont_test();
   exit();
 }

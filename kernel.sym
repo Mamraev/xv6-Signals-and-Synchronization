@@ -18,7 +18,7 @@
 8010a558 panicked
 80100410 consputc
 80100580 printint
-80107530 digits.1553
+80107530 digits.1559
 00000000 exec.c
 00000000 file.c
 00000000 fs.c
@@ -35,10 +35,10 @@
 00000000 ioapic.c
 00000000 kalloc.c
 00000000 kbd.c
-8010a5b4 shift.1387
+8010a5b4 shift.1393
 80107860 shiftcode
 80107760 togglecode
-80107740 charcode.1388
+80107740 charcode.1394
 80108200 normalmap
 80108100 shiftmap
 80108000 ctlmap
@@ -54,10 +54,10 @@
 00000000 picirq.c
 00000000 pipe.c
 00000000 proc.c
-8010a000 first.1616
+8010a000 first.1617
 801037c0 allocproc
 8010a5b8 initproc
-80107b20 states.1643
+80107b20 states.1644
 00000000 sleeplock.c
 00000000 spinlock.c
 00000000 string.c
@@ -89,7 +89,7 @@
 8010642a vector91
 80106220 vector33
 8010670f vector162
-80103d70 yield
+80103e00 yield
 80112680 log
 80112640 kmem
 80106973 vector213
@@ -105,7 +105,7 @@
 80106541 vector122
 80105a20 sys_sbrk
 80112760 ioapicid
-80104420 handle_signals
+80104400 handle_signals
 801066c7 vector156
 80106af3 vector245
 80112634 ioapic
@@ -118,7 +118,7 @@
 80106352 vector67
 801065ef vector138
 80106391 vector74
-80103b80 sched
+80103c10 sched
 80104a10 memmove
 801062f8 vector57
 80104d50 syscall
@@ -186,7 +186,7 @@
 80106577 vector128
 80107410 copyout
 801063d0 vector81
-80103dc0 sleep
+80103e50 sleep
 801027b0 microdelay
 80106172 vector13
 801062c2 vector51
@@ -209,7 +209,7 @@
 80100600 consolewrite
 80106256 vector39
 80106757 vector168
-80104240 sh_sigstop
+80104310 sh_sigstop
 80102c50 end_op
 80106232 vector35
 801064f0 vector113
@@ -249,7 +249,7 @@
 801067ab vector175
 8010662b vector143
 80100db0 filealloc
-80103f80 wakeup
+80104010 wakeup
 8010658f vector130
 80106aff vector246
 80106154 vector9
@@ -272,7 +272,7 @@
 80101990 readi
 801065cb vector135
 80100810 consoleintr
-80103fe0 kill
+80104070 kill
 801063ac vector77
 80103780 allocpid
 80101540 ialloc
@@ -300,7 +300,7 @@
 80104bf0 fetchstr
 801064ba vector107
 8010625f vector40
-80103e80 wait
+80103f10 wait
 8010648d vector102
 80109000 entrypgdir
 0010000c _start
@@ -310,7 +310,7 @@
 8010a48c _binary_initcode_end
 80100000 multiboot_header
 80106583 vector129
-801042a0 scheduler
+80103b70 scheduler
 80101be0 dirlookup
 801068b3 vector197
 80100e70 fileclose
@@ -344,14 +344,14 @@
 80102570 kbdgetc
 801064cc vector109
 801061ab vector20
-80103a30 fork
+80103a20 fork
 801062d4 vector53
 80106199 vector18
 0000008a _binary_entryother_size
 80112780 cpus
 80104680 releasesleep
 8010644e vector95
-801041b0 sigaction
+80104280 sigaction
 80104820 holding
 801109c0 sb
 80104850 acquire
@@ -378,7 +378,7 @@
 80105c10 sys_sigret
 801069c7 vector220
 80106421 vector90
-80104210 sh_sigkill
+801042e0 sh_sigkill
 8010671b vector163
 80106a6f vector234
 80102db0 log_write
@@ -394,7 +394,7 @@
 80106180 vector15
 8010668b vector151
 801063e2 vector83
-80104270 sh_sigcont
+80104340 sh_sigcont
 80106418 vector89
 8010640f vector88
 80105d00 trap
@@ -411,11 +411,11 @@
 80106a03 vector225
 80102770 lapicid
 8010683b vector187
-801039b0 growproc
+801039a0 growproc
 801046c0 holdingsleep
 80112d00 ncpu
 80106205 vector30
-801038c0 userinit
+801038b0 userinit
 801000d0 bread
 8010656e vector127
 80103540 piperead
@@ -437,7 +437,7 @@
 801065fb vector139
 801066a3 vector153
 80106727 vector164
-80104090 procdump
+80104160 procdump
 80106538 vector121
 801060c0 uartputc
 80106132 vector5
@@ -469,7 +469,7 @@
 801001a0 bwrite
 80106a63 vector233
 80105cd0 idtinit
-80103c40 exit
+80103cd0 exit
 801059b0 sys_wait
 801059a0 sys_exit
 80101e50 dirlink
@@ -478,7 +478,7 @@
 801045e0 initsleeplock
 80102030 ideinit
 80106f70 loaduvm
-80104390 sigret
+80104370 sigret
 8010649f vector104
 8010650b vector116
 80112d20 ptable
@@ -526,6 +526,6 @@
 80104780 pushcli
 801024a0 kinit2
 80106164 vector11
-80104160 sigprocmask
+80104230 sigprocmask
 80106179 vector14
 80100f40 filestat

@@ -117,11 +117,6 @@ found:
   }
   sp = p->kstack + KSTACKSIZE;
 
-  // Task 2.4 :     Leave room for the user trap frame backup
-  sp -= sizeof *p->uTrapFrameBU;
-  p->uTrapFrameBU = (struct trapframe*)sp;
-  
-
   // Leave room for trap frame.
   sp -= sizeof *p->tf;
   p->tf = (struct trapframe*)sp;
@@ -375,17 +370,23 @@ scheduler(void)
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
 
       // Handles frozen proc
-      if(p->frozen == 1){
+      if(p->frozen == 1)
+        continue;
+      /*if(p->frozen == 1){
         for(int i = 0 ; (p->pendingSignals!=0) && i < 32; i++){
-          if(((p->pendingSignals & (1 << i))!=0) && (p->signalHandler[i] == (void*) SIGCONT)){
+          if(((p->pendingSignals & (1 << i))!=0) && ((p->signalHandler[i] == (void*) SIGCONT)||(i==SIGCONT && p->signalHandler[i] == (void*)SIG_DFL))){
+            cprintf("cont\n");
+
             p->pendingSignals &= ~(0 << i);
             sh_sigcont();
           }else{
             continue;
           }
         }
+        if(p->frozen == 1)
+          continue;
 
-      }
+      }*/
 
       if(p->state != RUNNABLE)
         continue;
@@ -549,6 +550,11 @@ kill(int pid, int signum)
       //check for unblockable sigs
       if((signum==SIGKILL)&&(p->state == SLEEPING))
         p->state = RUNNABLE;
+      if(((signum==SIGCONT)&&p->signalHandler[signum]==(void*)SIG_DFL)||(p->signalHandler[signum]==(void*)SIGCONT)){
+        if((p->signalMask & (1 << signum)) == 0){
+          p->frozen=0;
+        }
+      }
       release(&ptable.lock);
       return 0;
     }
@@ -635,7 +641,8 @@ sh_sigcont(){
 
 void 
 sigret(){
-  memmove(&myproc()->signalMask, &myproc()->signalMaskBU, 4);
+  myproc()->signalMask=myproc()->signalMaskBU;
+  //memmove(&myproc()->signalMask, &myproc()->signalMaskBU, 4);
   memmove(myproc()->tf, myproc()->uTrapFrameBU, sizeof(struct trapframe));
 }
 
@@ -654,7 +661,7 @@ handle_signals(struct trapframe *tf){
 
       uint espbu = p->tf->esp;
 
-      int unblockable = (i == SIGKILL) || (i == SIGSTOP);
+      int unblockable = (i != SIGKILL) && (i != SIGSTOP);
 
       if((p->pendingSignals & (1 << i)) != 0){
 
@@ -667,18 +674,18 @@ handle_signals(struct trapframe *tf){
 
         p->pendingSignals &= ~(1 << i);
 
-        if(p->signalHandler[i] == (void*)SIGKILL || p->signalHandler[i] == (void*)SIG_DFL){
-          sh_sigkill();
-
-        }else if(p->signalHandler[i] == (void*)SIGSTOP){
+        if(p->signalHandler[i] == (void*)SIGSTOP || i == SIGSTOP){
           sh_sigstop();
 
-        }else if(p->signalHandler[i] == (void*)SIGCONT){
+        }else if(p->signalHandler[i] == (void*)SIGCONT || (i == SIGCONT && p->signalHandler[i] == (void*)SIG_DFL)){
           sh_sigcont();
 
+        }else if(p->signalHandler[i] == (void*)SIGKILL || p->signalHandler[i] == (void*)SIG_DFL){
+          sh_sigkill();
         }else { 
           // user signal
-          memmove(&p->signalMaskBU,&p->signalMask,4);
+          p->signalMaskBU=p->signalMask;
+          //memmove(&p->signalMaskBU,&p->signalMask,4);
           p->signalMask = p->signalHandlerMasks[i];
 
 
