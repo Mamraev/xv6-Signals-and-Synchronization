@@ -433,7 +433,7 @@ sched(void)
     panic("sched ptable.lock");*/
   if(mycpu()->ncli != 1)
     panic("sched locks");
-  if(p->state == RUNNING || p->state == -RUNNING)
+  if(p->state == RUNNING)
     panic("sched running");
   if(readeflags()&FL_IF)
     panic("sched interruptible");
