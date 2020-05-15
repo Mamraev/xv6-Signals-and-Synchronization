@@ -253,7 +253,9 @@ fork(void)
   //acquire(&ptable.lock);
   pushcli();
 
-  cas(&np->state,EMBRYO,RUNNABLE);
+  if(!cas(&np->state,EMBRYO,RUNNABLE)){
+    cprintf("fork cas error");
+  }
 
   //release(&ptable.lock);
   popcli();
@@ -297,6 +299,7 @@ exit(void)
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->parent == curproc){
       p->parent = initproc;
+      while(p->state == -ZOMBIE);
       if(p->state == ZOMBIE)
         wakeup1(initproc);
     }
@@ -430,7 +433,7 @@ sched(void)
     panic("sched ptable.lock");*/
   if(mycpu()->ncli != 1)
     panic("sched locks");
-  if(p->state == RUNNING)
+  if(p->state == RUNNING || p->state == -RUNNING)
     panic("sched running");
   if(readeflags()&FL_IF)
     panic("sched interruptible");
@@ -446,8 +449,10 @@ yield(void)
 {
   //acquire(&ptable.lock);  //DOC: yieldlock
   pushcli();
-  cas(&myproc()->state,RUNNING, -RUNNABLE);
-  
+  if(!cas(&myproc()->state,RUNNING, -RUNNABLE)){
+    cprintf("yeild cas err");
+  }
+
   sched();
 
   //myproc()->state = RUNNABLE;
@@ -501,10 +506,12 @@ sleep(void *chan, struct spinlock *lk)
     pushcli();
     release(lk);
   }
+  if(!cas(&p->state,RUNNING,-SLEEPING)){
+    cprintf("sleep cas error");
+  }
+
   // Go to sleep.
   p->chan = chan;
-
-  cas(&p->state,RUNNING,-SLEEPING);
 
   sched();
 
@@ -528,8 +535,8 @@ wakeup1(void *chan)
   struct proc *p;
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->state == SLEEPING && p->chan == chan)
-      cas(&p->state,SLEEPING,RUNNABLE);
+    if((p->state == SLEEPING || p->state == -SLEEPING) && p->chan == chan)
+      while(!cas(&p->state,SLEEPING,RUNNABLE));
   }
 }
 
@@ -563,8 +570,8 @@ kill(int pid, int signum)
       // Wake process from sleep if necessary.
       p->pendingSignals |= (1 << signum);
       //check for unblockable sigs
-      if((signum==SIGKILL)&&(p->state == SLEEPING))
-        p->state = RUNNABLE;
+      if((signum==SIGKILL)&&((p->state == SLEEPING) || (p->state == -SLEEPING)))
+        while(!cas(&p->state, SLEEPING, RUNNABLE));
       if(((signum==SIGCONT)&&p->signalHandler[signum]==(void*)SIG_DFL)||(p->signalHandler[signum]==(void*)SIGCONT)){
         if((p->signalMask & (1 << signum)) == 0){
           p->frozen=0;
@@ -608,6 +615,7 @@ procdump(void)
     else
       state = "???";
     cprintf("%d %s %s", p->pid, state, p->name);
+    while(p->state == -SLEEPING);
     if(p->state == SLEEPING){
       getcallerpcs((uint*)p->context->ebp+2, pc);
       for(i=0; i<10 && pc[i] != 0; i++)
