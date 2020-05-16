@@ -77,11 +77,12 @@ myproc(void) {
 int 
 allocpid(void) 
 {
+  pushcli();
   int pid;
   do{
     pid = nextpid;
   }while (!cas(&nextpid,pid,pid+1));
-
+  popcli();
   return pid+1;
 }
 
@@ -97,22 +98,30 @@ allocproc(void)
   char *sp;
 
   //acquire(&ptable.lock);
+  pushcli();
 
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(cas(&(p->state),UNUSED,EMBRYO))
+      if(cas(&(p->state),UNUSED,EMBRYO)){
         goto found;
-    }
+      }else{
+        //cprintf("state %d\n",p->state);
 
+      }
+    }
+    popcli();
+    cprintf("failed %d\n",p->state);
     return 0;
 
 found:
   //release
+  popcli();
 
   p->pid = allocpid();
 
   // Allocate kernel stack.
   if((p->kstack = kalloc()) == 0){
     p->state = UNUSED;
+    cprintf("failed kalloc");
     return 0;
   }
   sp = p->kstack + KSTACKSIZE;
@@ -136,6 +145,8 @@ found:
     p->signalHandler[i] =(void*)SIG_DFL;
     p->signalHandlerMasks[i] = 0;
   }
+  p->pendingSignals = 0;
+  p->signalMask = 0;
   return p;
 }
 
@@ -176,8 +187,10 @@ userinit(void)
   //acquire(&ptable.lock);
   pushcli();
 
-  p->state = RUNNABLE;
-  cas(&p->state,EMBRYO,RUNNABLE);
+  //p->state = RUNNABLE;
+  if(!cas(&p->state,EMBRYO,RUNNABLE)){
+    cprintf("user init cas err");
+  }
 
   //release(&ptable.lock);
   popcli();
@@ -216,6 +229,7 @@ fork(void)
 
   // Allocate process.
   if((np = allocproc()) == 0){
+    cprintf("failed in allocproc\n\n");
     return -1;
   }
 
@@ -224,6 +238,7 @@ fork(void)
     kfree(np->kstack);
     np->kstack = 0;
     np->state = UNUSED;
+    cprintf("failed in copyuvm\n\n");
     return -1;
   }
   np->sz = curproc->sz;
@@ -232,6 +247,7 @@ fork(void)
 
   // Task 2.1.2 :     Copy signal mask and signal handlers to the child
   np->signalMask = curproc->signalMask;
+  np->pendingSignals = 0;
 
   for(int i = 0 ; i < 32 ; i++){
     np->signalHandler[i] = curproc->signalHandler[i];
@@ -291,6 +307,9 @@ exit(void)
 
   //acquire(&ptable.lock);
   pushcli();
+  if(!cas(&curproc->state,RUNNING,-ZOMBIE)){
+    cprintf("exit cas err %d\n",curproc->state);
+  }
 
   // Parent might be sleeping in wait().
   wakeup1(curproc->parent);
@@ -299,14 +318,13 @@ exit(void)
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->parent == curproc){
       p->parent = initproc;
-      while(p->state == -ZOMBIE);
+      //while(p->state == -ZOMBIE);
       if(p->state == ZOMBIE)
         wakeup1(initproc);
     }
   }
 
-  // Jump into the scheduler, never to return.
-  cas(&curproc->state,RUNNING,-ZOMBIE);
+  
   sched();
   panic("zombie exit");
 }
@@ -324,12 +342,16 @@ wait(void)
   pushcli();
 
   for(;;){
+    if(!cas(&curproc->state,RUNNING,-SLEEPING)){
+      cprintf("wait cas err1\n");
+    }
     // Scan through table looking for exited children.
     havekids = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->parent != curproc)
         continue;
       havekids = 1;
+      while(p->state == -ZOMBIE);
       if(p->state == ZOMBIE){
         // Found one.
         pid = p->pid;
@@ -340,11 +362,17 @@ wait(void)
         p->parent = 0;
         p->name[0] = 0;
         p->killed = 0;
+        cas(&curproc->state,-SLEEPING,RUNNING);
+        //cas(&p->state,-UNUSED,UNUSED);
         p->state = UNUSED;
         //release(&ptable.lock);
         popcli();
         return pid;
       }
+    }
+    //cas(&curproc->state,-SLEEPING,RUNNING);
+    if(!cas(&curproc->state,-SLEEPING,RUNNING)){
+      cprintf("wait cas err2 %d\n",curproc->state);
     }
 
     // No point waiting if we don't have any children.
@@ -353,6 +381,7 @@ wait(void)
       popcli();
       return -1;
     }
+
 
     // Wait for children to exit.  (See wakeup1 call in proc_exit.)
     sleep(curproc, &ptable.lock);  //DOC: wait-sleep
@@ -408,6 +437,7 @@ scheduler(void)
       cas(&p->state,-RUNNABLE, RUNNABLE);
       cas(&p->state,-SLEEPING, SLEEPING);
       cas(&p->state,-ZOMBIE, ZOMBIE);
+      cas(&p->state,-UNUSED, UNUSED);
 
     }
     //release(&ptable.lock);
@@ -507,7 +537,7 @@ sleep(void *chan, struct spinlock *lk)
     release(lk);
   }
   if(!cas(&p->state,RUNNING,-SLEEPING)){
-    cprintf("sleep cas error");
+    cprintf("sleep cas error %d", p->state);
   }
 
   // Go to sleep.
@@ -535,8 +565,17 @@ wakeup1(void *chan)
   struct proc *p;
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if((p->state == SLEEPING || p->state == -SLEEPING) && p->chan == chan)
-      while(!cas(&p->state,SLEEPING,RUNNABLE));
+    while(p->state == -SLEEPING);
+    if((p->state == SLEEPING) && p->chan == chan){
+      if(cas(&p->state,SLEEPING,-RUNNABLE)){
+        p->chan = 0;
+        if(!cas(&p->state,-RUNNABLE,RUNNABLE)){
+          cprintf("wakeup1 cas err\n");
+        }
+      }
+
+    }
+      
   }
 }
 
@@ -565,13 +604,17 @@ kill(int pid, int signum)
   //acquire(&ptable.lock);
   pushcli();
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->pid == pid){
+    if(p->pid == pid && p->state !=UNUSED){
       //p->killed = 1; TODO : add this to SIGKILL
       // Wake process from sleep if necessary.
       p->pendingSignals |= (1 << signum);
       //check for unblockable sigs
-      if((signum==SIGKILL)&&((p->state == SLEEPING) || (p->state == -SLEEPING)))
-        while(!cas(&p->state, SLEEPING, RUNNABLE));
+      if((signum==SIGKILL)&&((p->state == SLEEPING) || (p->state == -SLEEPING))){
+        while(p->state == -SLEEPING);
+        cas(&p->state, SLEEPING, RUNNABLE);
+
+      }
+        
       if(((signum==SIGCONT)&&p->signalHandler[signum]==(void*)SIG_DFL)||(p->signalHandler[signum]==(void*)SIGCONT)){
         if((p->signalMask & (1 << signum)) == 0){
           p->frozen=0;
@@ -615,7 +658,7 @@ procdump(void)
     else
       state = "???";
     cprintf("%d %s %s", p->pid, state, p->name);
-    while(p->state == -SLEEPING);
+    //while(p->state == -SLEEPING);
     if(p->state == SLEEPING){
       getcallerpcs((uint*)p->context->ebp+2, pc);
       for(i=0; i<10 && pc[i] != 0; i++)
@@ -674,11 +717,14 @@ sigret(){
 void
 handle_signals(struct trapframe *tf){
     struct proc* p = myproc();
-
+    
+    if(p == 0){
+      return;
+    }
     if((tf->cs &3) != DPL_USER)
       return;
 
-    if(p->killed == 1){
+    if(p->killed){
       return;
     }
 
