@@ -1575,10 +1575,16 @@ validatetest(void)
       validateint((int*)p);
       exit();
     }
+    printf(stdout, "TEST1\n");
     sleep(0);
+    printf(stdout, "TEST2\n");
     sleep(0);
+    printf(stdout, "TEST3\n");
     kill(pid,SIGKILL);
+    printf(stdout, "TEST4\n");
     wait();
+    printf(stdout, "TEST5\n");
+
 
     // try to crash the kernel by passing in a bad string pointer
     if(link("nosuchfile", (char*)p) != -1){

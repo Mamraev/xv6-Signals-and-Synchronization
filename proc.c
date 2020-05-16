@@ -351,8 +351,8 @@ wait(void)
       if(p->parent != curproc)
         continue;
       havekids = 1;
-      while(p->state == -ZOMBIE);
-      if(p->state == ZOMBIE){
+      while(p->state == -ZOMBIE){cprintf("neg zombie");}
+      if(cas(&p->state ,ZOMBIE, PRE_UNUSED)){
         // Found one.
         pid = p->pid;
         kfree(p->kstack);
@@ -363,8 +363,8 @@ wait(void)
         p->name[0] = 0;
         p->killed = 0;
         cas(&curproc->state,-SLEEPING,RUNNING);
-        //cas(&p->state,-UNUSED,UNUSED);
-        p->state = UNUSED;
+        cas(&p->state,PRE_UNUSED,UNUSED);
+        //p->state = UNUSED;
         //release(&ptable.lock);
         popcli();
         return pid;
