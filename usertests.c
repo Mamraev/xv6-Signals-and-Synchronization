@@ -1575,15 +1575,10 @@ validatetest(void)
       validateint((int*)p);
       exit();
     }
-    printf(stdout, "TEST1\n");
     sleep(0);
-    printf(stdout, "TEST2\n");
     sleep(0);
-    printf(stdout, "TEST3\n");
     kill(pid,SIGKILL);
-    printf(stdout, "TEST4\n");
     wait();
-    printf(stdout, "TEST5\n");
 
 
     // try to crash the kernel by passing in a bad string pointer
@@ -1763,6 +1758,35 @@ main(int argc, char *argv[])
   }
   close(open("usertests.ran", O_CREATE));
 
+  /*exitwait();
+  exitwait();
+  exitwait();
+  exitwait();
+  exitwait();
+  exitwait();
+  exitwait();
+  exitwait();
+  exitwait();
+  printf(1,"finish\n");
+
+  validatetest();
+  validatetest();
+  validatetest();
+  validatetest();
+  validatetest();
+  validatetest();
+  validatetest();
+  validatetest();
+  concreate();
+  concreate();
+  concreate();
+  concreate();
+  concreate();
+  concreate();
+  concreate();*/
+
+
+
   argptest();
   createdelete();
   linkunlink();
@@ -1800,7 +1824,7 @@ main(int argc, char *argv[])
   dirfile();
   iref();
   forktest();
-  bigdir(); // slow
+  //bigdir(); // slow
 
   uio();
 
