@@ -1757,8 +1757,8 @@ main(int argc, char *argv[])
     exit();
   }
   close(open("usertests.ran", O_CREATE));
-
-  /*exitwait();
+/*
+  exitwait();
   exitwait();
   exitwait();
   exitwait();
@@ -1783,7 +1783,9 @@ main(int argc, char *argv[])
   concreate();
   concreate();
   concreate();
-  concreate();*/
+  concreate();
+  printf(1,"finished\n");*/
+  
 
 
 
@@ -1817,7 +1819,7 @@ main(int argc, char *argv[])
 
   rmdot();
   fourteen();
-  bigfile();
+  //bigfile();
   subdir();
   linktest();
   unlinkread();
@@ -1829,6 +1831,7 @@ main(int argc, char *argv[])
   uio();
 
   exectest();
+  
 
   exit();
 }

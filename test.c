@@ -26,6 +26,41 @@ signalHandlerNoExit(int signum){ //added
   printf(1, " C");
   return;
 }
+
+void 
+signalHandlerWait(int signum){ //added
+  sleep(50);
+  printf(1, " A");
+  return;
+}
+
+void
+inner_mask_test(){
+    printf(1, "\n\n[start] inner mask test | should print : A B\n\n[");
+
+    struct sigaction *act= malloc(sizeof(struct sigaction*));
+    act->sa_handler=signalHandlerWait;
+    act->sigmask=1 << 1;
+    sigaction(2,act,null);
+
+    act->sa_handler=(void*)SIGSTOP;
+    act->sigmask=0;
+    sigaction(1,act,null);
+
+    int pid = fork();
+    if(pid == 0){
+      sleep(10);
+      printf(1," B");
+      exit();
+    }
+    kill(pid,2);
+    kill(pid,1);
+    sleep(100);
+    kill(pid,SIGCONT);
+    wait();
+    printf(1, " ] [finished]\n\n");
+}
+
 void
 send_signal_test(){
     printf(1, "\n\n[start] send signal & mask test | should print : A B\n\n[");
@@ -104,10 +139,68 @@ stop_cont_test(){
     }
 }
 
+void
+old_act_test(){
+    printf(1, "\n\n[start] old act test | should print : C B\n\n[");
+
+    struct sigaction *act= malloc(sizeof(struct sigaction*));
+    act->sa_handler=signalHandler2;
+    act->sigmask=0;
+    sigaction(2,act,null);
+
+    struct sigaction *old_act= malloc(sizeof(struct sigaction*));
+    act->sa_handler=signalHandlerNoExit;
+    sigaction(2,act,old_act);
+    sigaction(1,old_act, null);
+
+    
+    int currpid = getpid();
+    int pid = fork();
+    if(pid == 0){
+        sleep(100);
+
+    }else{
+        kill(currpid,2);
+        sleep(10);
+
+        kill(pid,1);
+    }
+    wait();
+    printf(1, " ] [finished]\n\n");
+}
+
+void
+modify_test(){
+    printf(1, "\n\n[start] modify test ");
+    struct sigaction *act= malloc(sizeof(struct sigaction*));
+    act->sa_handler=(void*)SIGSTOP;
+    act->sigmask=0;
+    if(sigaction(SIGKILL,act,null) != -1){
+      printf(1,"failed\n");
+    }
+    else if(sigaction(SIGSTOP,act,null) != -1){
+      printf(1,"failed\n");
+    }
+    else if(sigaction(5,act,null) != 0){
+      printf(1,"failed\n");
+    }
+    else if(sigaction(5,act,null) != 0){
+      printf(1,"failed\n");
+    }else{
+      printf(1, " [finished]\n\n");
+    }
+
+}
+
 int
 main(int argc, char *argv[]){
   send_signal_test();
   sigret_test();
   stop_cont_test();
+  inner_mask_test();
+
+  old_act_test();
+  modify_test();
+
   exit();
 }

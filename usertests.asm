@@ -49,8 +49,8 @@ main(int argc, char *argv[])
       51:	e8 8c 38 00 00       	call   38e2 <open>
       56:	89 04 24             	mov    %eax,(%esp)
       59:	e8 6c 38 00 00       	call   38ca <close>
-  concreate();
-  concreate();*/
+  printf(1,"finished\n");*/
+  
 
 
 
@@ -109,32 +109,34 @@ main(int argc, char *argv[])
       d1:	e8 fa 26 00 00       	call   27d0 <rmdot>
   fourteen();
       d6:	e8 b5 25 00 00       	call   2690 <fourteen>
-  bigfile();
-      db:	e8 e0 23 00 00       	call   24c0 <bigfile>
+  //bigfile();
   subdir();
-      e0:	e8 1b 1c 00 00       	call   1d00 <subdir>
+      db:	e8 20 1c 00 00       	call   1d00 <subdir>
   linktest();
-      e5:	e8 c6 14 00 00       	call   15b0 <linktest>
+      e0:	e8 cb 14 00 00       	call   15b0 <linktest>
   unlinkread();
-      ea:	e8 31 13 00 00       	call   1420 <unlinkread>
+      e5:	e8 36 13 00 00       	call   1420 <unlinkread>
   dirfile();
-      ef:	e8 5c 28 00 00       	call   2950 <dirfile>
+      ea:	e8 61 28 00 00       	call   2950 <dirfile>
   iref();
-      f4:	e8 57 2a 00 00       	call   2b50 <iref>
+      ef:	e8 5c 2a 00 00       	call   2b50 <iref>
   forktest();
-      f9:	e8 72 2b 00 00       	call   2c70 <forktest>
+      f4:	e8 77 2b 00 00       	call   2c70 <forktest>
   //bigdir(); // slow
 
   uio();
-      fe:	e8 4d 34 00 00       	call   3550 <uio>
+      f9:	e8 52 34 00 00       	call   3550 <uio>
 
   exectest();
-     103:	e8 a8 08 00 00       	call   9b0 <exectest>
+      fe:	e8 ad 08 00 00       	call   9b0 <exectest>
+  
 
   exit();
-     108:	e8 95 37 00 00       	call   38a2 <exit>
-     10d:	66 90                	xchg   %ax,%ax
-     10f:	90                   	nop
+     103:	e8 9a 37 00 00       	call   38a2 <exit>
+     108:	66 90                	xchg   %ax,%ax
+     10a:	66 90                	xchg   %ax,%ax
+     10c:	66 90                	xchg   %ax,%ax
+     10e:	66 90                	xchg   %ax,%ax
 
 00000110 <iputtest>:
 {

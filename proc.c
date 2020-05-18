@@ -25,6 +25,8 @@ extern void forkret(void);
 extern void trapret(void);
 
 static void wakeup1(void *chan);
+int is_it_sigkill(struct proc *p, int signum);
+int check_cont_sig(struct proc *p);
 
 void
 pinit(void)
@@ -96,23 +98,17 @@ allocproc(void)
 {
   struct proc *p;
   char *sp;
-
-  //acquire(&ptable.lock);
   pushcli();
 
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(cas(&(p->state),UNUSED,EMBRYO)){
         goto found;
-      }else{
-        //cprintf("state %d\n",p->state);
-
       }
     }
     popcli();
     return 0;
 
 found:
-  //release
   popcli();
 
   p->pid = allocpid();
@@ -185,12 +181,10 @@ userinit(void)
   //acquire(&ptable.lock);
   pushcli();
 
-  //p->state = RUNNABLE;
   if(!cas(&p->state,EMBRYO,RUNNABLE)){
-    cprintf("user init cas err");
+    panic("user init cas err");
   }
 
-  //release(&ptable.lock);
   popcli();
 }
 
@@ -262,14 +256,12 @@ fork(void)
 
   pid = np->pid;
 
-  //acquire(&ptable.lock);
   pushcli();
 
   if(!cas(&np->state,EMBRYO,RUNNABLE)){
-    cprintf("fork cas error");
+    panic("fork cas error");
   }
 
-  //release(&ptable.lock);
   popcli();
 
   return pid;
@@ -301,7 +293,6 @@ exit(void)
   end_op();
   curproc->cwd = 0;
 
-  //acquire(&ptable.lock);
   pushcli();
   if(!cas(&curproc->state,RUNNING,-ZOMBIE)){
     cprintf("exit cas err %d\n",curproc->state);
@@ -313,7 +304,7 @@ exit(void)
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->parent == curproc){
       p->parent = initproc;
-      while(p->state < 0){cprintf("neg_somthing %d  ", p->state);}
+      while(p->state == -ZOMBIE);
       if(p->state == ZOMBIE)
         wakeup1(initproc);
     }
@@ -333,14 +324,13 @@ wait(void)
   int havekids, pid;  
   struct proc *curproc = myproc();
   
-  //acquire(&ptable.lock);
   pushcli();
 
   for(;;){
     if(!cas(&curproc->state,RUNNING,-SLEEPING)){
       cprintf("wait cas err1\n");
     }
-    //curproc->chan = curproc;
+    curproc->chan = curproc;
     // Scan through table looking for exited children.
     havekids = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
@@ -349,7 +339,7 @@ wait(void)
       havekids = 1;
       while(p->state == -ZOMBIE);
       
-      if(cas(&p->state ,ZOMBIE, WAITING)){
+      if(cas(&p->state ,ZOMBIE, PRE_UNUSED)){
         // Found one.
         pid = p->pid;
         kfree(p->kstack);
@@ -360,14 +350,12 @@ wait(void)
         p->name[0] = 0;
         p->killed = 0;
         if(!cas(&curproc->state,-SLEEPING,RUNNING)){
-          cprintf("wait casa err 1 &d\n",p->state);
+          panic("wait cas\n");
 
         }
-        if(!cas(&p->state,WAITING,UNUSED)){
-          cprintf("wait casa err 2 &d\n",p->state);
+        if(!cas(&p->state,PRE_UNUSED,UNUSED)){
+          panic("wait cas\n");
         }
-        //p->state = UNUSED;
-        //release(&ptable.lock);
         popcli();
         return pid;
       }
@@ -376,12 +364,10 @@ wait(void)
 
     // No point waiting if we don't have any children.
     if(!havekids || curproc->killed){
-      //cas(&curproc->state,-SLEEPING,RUNNING);
       if(!cas(&curproc->state,-SLEEPING,RUNNING)){
-        cprintf("wait cas err2 %d\n",curproc->state);
+        panic("wait cas err\n");
       }
-      //curproc->chan = 0;
-      //release(&ptable.lock);
+      curproc->chan = 0;
       popcli();
       return -1;
     }
@@ -390,7 +376,7 @@ wait(void)
     // Wait for children to exit.  (See wakeup1 call in proc_exit.)
       // Go to sleep.
       
-    curproc->chan = curproc;
+    //curproc->chan = curproc;
 
     sched();
 
@@ -424,8 +410,13 @@ scheduler(void)
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
 
       // Handles frozen proc
-      if(p->frozen == 1)
-        continue;
+      if(p->frozen){
+        if(check_cont_sig(p)){
+          p->frozen = 0;
+        }else{
+          continue;
+        }
+      }
 
       if(!cas(&p->state, RUNNABLE, -RUNNING))
         continue;
@@ -448,10 +439,7 @@ scheduler(void)
       cas(&p->state,-RUNNABLE, RUNNABLE);
       cas(&p->state,-SLEEPING, SLEEPING);
       cas(&p->state,-ZOMBIE, ZOMBIE);
-      cas(&p->state,-UNUSED, UNUSED);
-
     }
-    //release(&ptable.lock);
     popcli();
 
   }
@@ -491,7 +479,7 @@ yield(void)
   //acquire(&ptable.lock);  //DOC: yieldlock
   pushcli();
   if(!cas(&myproc()->state,RUNNING, -RUNNABLE)){
-    cprintf("yeild cas err");
+    panic("yeild cas");
   }
 
   sched();
@@ -543,7 +531,7 @@ sleep(void *chan, struct spinlock *lk)
   // (wakeup runs with ptable.lock locked),
   // so it's okay to release lk.
   if(!cas(&p->state,RUNNING,-SLEEPING)){
-    //cprintf("sleep cas error %d", p->state);
+    panic("sleep cas");
   }
 
 
@@ -583,12 +571,10 @@ wakeup1(void *chan)
       if(cas(&p->state,SLEEPING,-RUNNABLE)){
         p->chan = 0;
         if(!cas(&p->state,-RUNNABLE,RUNNABLE)){
-          cprintf("wakeup1 cas err\n");
+          panic("wakeup cas");
         }
       }
-
     }
-      
   }
 }
 
@@ -600,6 +586,8 @@ wakeup(void *chan)
   wakeup1(chan);
   popcli();
 }
+
+
 
 // Kill the process with the given pid.
 // Process won't exit until it returns
@@ -618,31 +606,26 @@ kill(int pid, int signum)
   pushcli();
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->pid == pid && p->state !=UNUSED){
-      //p->killed = 1; TODO : add this to SIGKILL
-      // Wake process from sleep if necessary.
       if(p->signalHandler[signum]==(void*)SIG_IGN){
         popcli();
         return 0;
       }
       p->pendingSignals |= (1 << signum);
-      //check for unblockable sigs
-      if(((signum==SIGKILL) || ((p->signalHandler == (void*)SIGKILL) && ((p->pendingSignals & (1 << signum)) != 0)))
-      &&((p->state == SLEEPING) || (p->state == -SLEEPING))){
-        while(p->state == -SLEEPING){cprintf("neg sleeping in kill  ");}
-        cas(&p->state, SLEEPING, RUNNABLE);
-      }
-        
-      if(((signum==SIGCONT)&&p->signalHandler[signum]==(void*)SIG_DFL)||(p->signalHandler[signum]==(void*)SIGCONT)){
-        if((p->signalMask & (1 << signum)) == 0){
-          p->frozen=0;
+
+      if((p->state == SLEEPING) || (p->state == -SLEEPING)){
+        if((signum == SIGKILL) ||
+        (((p->signalMask & (1 << signum)) == 0) && (p->signalHandler[signum]== (void*)SIGKILL || p->signalHandler[signum]== (void*)SIG_DFL))){
+          while(p->state == -SLEEPING);
+          cas(&p->state, SLEEPING, RUNNABLE);
         }
+         
       }
-      //release(&ptable.lock);
+
+      
       popcli();
       return 0;
     }
   }
-  //release(&ptable.lock);
   popcli();
   return -1;
 }
@@ -696,7 +679,7 @@ int
 sigaction(int signum, const struct sigaction *act, struct sigaction *oldact){
   struct proc *p;
   p=myproc();
-  if(oldact!=null){ // TODO change to NULL
+  if(oldact!=null){ 
     oldact->sa_handler = p->signalHandler[signum];
     oldact->sigmask = p->signalHandlerMasks[signum];
   } 
@@ -708,6 +691,32 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact){
 }
 
 /************************* SIGNAL HANDLERS *************************/
+int
+is_it_sigkill(struct proc *p, int signum){
+  if(signum == SIGKILL){
+    return 1;
+  }
+  if((p->signalMask & (1 << signum)) == 0){
+    if(p->signalHandler[signum]== (void*)SIGKILL || p->signalHandler[signum]== (void*)SIG_DFL){
+      return 1;
+    }
+  }
+  cprintf("no");
+  return 0;
+}
+int
+check_cont_sig(struct proc *p){
+  int def ;
+  for(int i = 0 ; i < 32; i++){
+     def = ((i == SIGCONT) && (p->signalHandler[i] == (void*)SIG_DFL));
+    if(((p->pendingSignals & (1 << i)) != 0) && ((p->signalMask & (1 << i)) == 0) && ((p->signalHandler[i] == (void*)SIGCONT) || def)){
+      p->pendingSignals = p->pendingSignals ^ (1 << i);
+      return 1;
+    }
+  }
+  return 0;
+}
+
 void 
 sh_sigkill(){
   myproc()->killed = 1;
@@ -749,14 +758,14 @@ handle_signals(struct trapframe *tf){
 
       uint espbu = p->tf->esp;
 
-      int unblockable = (i != SIGKILL) && (i != SIGSTOP);
+      int blockable = (i != SIGKILL) && (i != SIGSTOP);
 
       if((p->pendingSignals & (1 << i)) != 0){
 
-        if(((p->signalMask & (1 << i)) != 0) && unblockable){
+        if(((p->signalMask & (1 << i)) != 0) && blockable){
           continue; // signal is blocked and blockable
         }
-        if(p->signalHandler[i]==(void*)SIG_IGN && unblockable){
+        if(p->signalHandler[i]==(void*)SIG_IGN && blockable){
           continue; // signal ignored and blockable
         }
 
